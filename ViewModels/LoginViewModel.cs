@@ -15,6 +15,7 @@ using Assignment.View.View;
 using System.Windows;
 using System.Data.SqlClient;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 
 namespace Assignment.View.ViewModel
 {
@@ -95,10 +96,16 @@ namespace Assignment.View.ViewModel
             //RecoverPasswordCommand = new ViewModelCommand(p => ExecuteRecoverPasswordCommand("", ""));
         }
 
-        private bool CanExecuteLoginCommand(object obj)
+        //private bool CanExecuteLoginCommand(object obj)
+        //{
+        //    // Ensure both fields are filled before enabling the button
+        //    return !string.IsNullOrWhiteSpace(Email) && Password?.Length > 0;
+        //}
+        public static bool IsValidEmail(string email)
         {
-            // Ensure both fields are filled before enabling the button
-            return !string.IsNullOrWhiteSpace(Email) && Password?.Length > 0;
+            string pattern = @"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$";
+            Regex regex = new Regex(pattern);
+            return regex.IsMatch(email);
         }
         private void ExecuteRegisterCommand(object parameter)
         {
@@ -121,65 +128,65 @@ namespace Assignment.View.ViewModel
 
         private void ExecuteLoginCommand(object obj)
         {
-            using (var conn = new SqlConnection(@"Server=(localdb)\LocalInstance;Database=Assignment;Integrated Security=True;Encrypt=False"))
-            {
-                conn.Open();
-                string query = "SELECT COUNT(*) FROM Users WHERE Email = @Email AND Password = @Password";
-                using (var command = new SqlCommand(query, conn))
-                {
-                    command.Parameters.AddWithValue("@Email", Email);
-                    command.Parameters.AddWithValue("@Password", ConvertToUnsecureString(Password)); // Ensure this is the same way you stored passwords
+            ErrorMessage = string.Empty;
 
-                    int userCount = (int)command.ExecuteScalar();
-                    if (userCount > 0)
+            bool loginValidation = true;
+
+            // Validate Email
+            if (string.IsNullOrWhiteSpace(Email))
+            {
+                ErrorMessage = "Email is required.";
+                loginValidation = false;
+            }
+            else if (!IsValidEmail(Email))
+            {
+                ErrorMessage = "Invalid email format.";
+                loginValidation = false;
+            }
+
+            // Validate Password
+            if (Password == null || Password.Length == 0)
+            {
+                ErrorMessage += "\nPassword is required.";
+                loginValidation = false;
+            }
+            //else if (!IsValidPassword(Password))
+            //{
+            //    ErrorMessage += "\nPassword must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number.";
+            //    loginValidation = false;
+            //}
+
+
+
+            if (loginValidation)
+            {
+                using (var conn = new SqlConnection(@"Server=(localdb)\LocalInstance;Database=Assignment;Integrated Security=True;Encrypt=False"))
+                {
+                    conn.Open();
+                    string query = "SELECT COUNT(*) FROM Users WHERE Email = @Email AND Password = @Password";
+                    using (var command = new SqlCommand(query, conn))
                     {
-                        // User exists, redirect to UserListView
-                        var userListView = new UserListView(); // Make sure to create this view
-                        userListView.Show();
-                        Application.Current.MainWindow.Close(); // Close login window if applicable
-                    }
-                    else
-                    {
-                        // Invalid credentials
-                        ErrorMessage = "Invalid email or password.";
+                        command.Parameters.AddWithValue("@Email", Email);
+                        command.Parameters.AddWithValue("@Password", ConvertToUnsecureString(Password)); // Ensure this is the same way you stored passwords
+
+                        int userCount = (int)command.ExecuteScalar();
+                        if (userCount > 0)
+                        {
+                            // User exists, redirect to UserListView
+                            var userListView = new UserListView(); // Make sure to create this view
+                            userListView.Show();
+                            Application.Current.MainWindow.Close(); // Close login window if applicable
+                        }
+                        else
+                        {
+                            // Invalid credentials
+                            ErrorMessage = "Invalid email or password.";
+                        }
                     }
                 }
             }
         }
 
-        //private void ExecuteLoginCommand(object parameter)
-        //{
-        //    using (var connection = new SqlConnection(@"Server=(localdb)\LocalInstance;Database=Assignment;Integrated Security=True;Encrypt=False"))
-        //    {
-        //        connection.Open();
-        //        var query = "SELECT FirstName FROM Users WHERE Email = @Email AND Password = @Password";
-        //        using (var command = new SqlCommand(query, connection))
-        //        {
-        //            command.Parameters.AddWithValue("@Email", Email);
-        //            command.Parameters.AddWithValue("@Password", Password);
-
-        //            object result = command.ExecuteScalar();
-        //            if (result is string firstName && !string.IsNullOrEmpty(firstName))
-        //            {
-        //                if (!string.IsNullOrEmpty(firstName))
-        //                {
-        //                    // Pass FirstName to UserListView
-        //                    var userListView = new UserListView();
-        //                    var userListViewModel = new UserListViewModel(firstName);
-        //                    userListView.DataContext = userListViewModel;
-
-        //                    userListView.Show();
-        //                    Application.Current.MainWindow.Close();
-        //                }
-        //                else
-        //                {
-        //                    ErrorMessage = "Invalid credentials!";
-        //                }
-        //            }
-
-        //        }
-        //    }
-        //}
 
         public static string ConvertToUnsecureString(SecureString securePassword)
         {

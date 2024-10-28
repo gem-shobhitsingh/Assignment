@@ -178,87 +178,100 @@ namespace Assignment.View.ViewModel
             }
         }
 
+
         private void ExecuteRegisterCommand(object obj)
         {
-            var myCredential = new NetworkCredential(Email, Password);
-            var myCredential2 = new NetworkCredential(Email, ConfirmPassword);
-
-
-            bool registerValidation = true;
-
-            if (!string.Equals(myCredential.Password, myCredential2.Password))
+            ErrorMessage = string.Empty;
+            // Ensure all required fields are initialized
+            if (string.IsNullOrEmpty(Email) || Password == null || ConfirmPassword == null ||
+                string.IsNullOrEmpty(Gender) || string.IsNullOrEmpty(FirstName) || string.IsNullOrEmpty(LastName))
             {
-                ErrorMessage = "Password is not same as Confirm password";
-                registerValidation = false;
+                ErrorMessage = "All fields are required.";
+                return;
             }
 
-            if (Password.Length < 6 || Password.Length > 16)
+            // Convert SecureString to string for validation purposes
+            string unsecurePassword = ConvertToUnsecureString(Password);
+            string unsecureConfirmPassword = ConvertToUnsecureString(ConfirmPassword);
+           
+
+            // Validate password match
+            if (unsecurePassword != unsecureConfirmPassword)
             {
-                ErrorMessage = "Invalid password format";
-                registerValidation = false;
+                ErrorMessage += "Password and Confirm Password do not match.\n";
             }
 
-            if (string.IsNullOrEmpty(Email) && IsValidEmail(Email))
+            // Password requirements check
+            if (unsecurePassword.Length < 6 || unsecurePassword.Length > 16)
             {
-                ErrorMessage = "Email is required";
-                registerValidation = false;
+                ErrorMessage += "Password must be between 6 and 16 characters.\n";
             }
 
+            // Validate email
+            if (string.IsNullOrWhiteSpace(Email))
+            {
+                ErrorMessage += "Email is required.\n";
+            }
+            else if (!IsValidEmail(Email))
+            {
+                ErrorMessage += "Invalid email format.\n";
+            }
+
+            // Validate gender selection
             if (Gender.Contains("Please Select"))
             {
-                ErrorMessage = "Option not selected";
-                registerValidation = false;
+                ErrorMessage += "Please select a valid gender option.\n";
             }
 
-            if (string.IsNullOrEmpty(LastName))
-            {
-                ErrorMessage = "LastName is required";
-                registerValidation = false;
-            }
-
+            // Validate first and last names
             if (string.IsNullOrEmpty(FirstName))
             {
-                ErrorMessage = "FirstName is required";
-                registerValidation = false;
+                ErrorMessage += "First Name is required.\n";
+            }
+            if (string.IsNullOrEmpty(LastName))
+            {
+                ErrorMessage += "Last Name is required.\n";
             }
 
-            if (string.IsNullOrEmpty(FirstName) && string.IsNullOrEmpty(LastName) && Gender.Contains("Please Select") && string.IsNullOrEmpty(Email) && string.IsNullOrEmpty(myCredential.Password) && string.IsNullOrEmpty(myCredential2.Password))
+            // If there are any validation errors, exit the method
+            if (!string.IsNullOrEmpty(ErrorMessage))
             {
-                ErrorMessage = "All fields are empty";
-                registerValidation = false;
+                return;
             }
 
-            if (registerValidation)
+            // Proceed with database insertion if validation passes
+            try
             {
-
-            using (var conn = new SqlConnection(@"Server=(localdb)\LocalInstance;Database=Assignment;Integrated Security=True;Encrypt=False")) 
-            using (var command = new SqlCommand())
-            {
-                if (conn.State == ConnectionState.Closed)
+                using (var conn = new SqlConnection(@"Server=(localdb)\LocalInstance;Database=Assignment;Integrated Security=True;Encrypt=False"))
+                using (var command = new SqlCommand())
+                {
                     conn.Open();
-               string addData = "INSERT INTO Users (FirstName, LastName, Gender, Email, DOB, Password) VALUES (@firstName, @lastName, @gender, @Email, @DateOfBirth, @Password)";
-                string unsecurePassword = ConvertToUnsecureString(Password);
-                command.Connection = conn;
-                command.CommandText = addData;
-                command.Parameters.AddWithValue("@firstName", FirstName);
-                command.Parameters.AddWithValue("@lastName", LastName);
-                command.Parameters.AddWithValue("@gender", formattedString(Gender));
-                command.Parameters.AddWithValue("@Email", Email);
-                command.Parameters.AddWithValue("@DateOfBirth", DateOfBirth);
-                command.Parameters.AddWithValue("@Password", unsecurePassword);
-                command.ExecuteNonQuery();
-            conn.Close();
+                    string addData = "INSERT INTO Users (FirstName, LastName, Gender, Email, DOB, Password) VALUES (@firstName, @lastName, @gender, @Email, @DateOfBirth, @Password)";
+                    command.Connection = conn;
+                    command.CommandText = addData;
+                    command.Parameters.AddWithValue("@firstName", FirstName);
+                    command.Parameters.AddWithValue("@lastName", LastName);
+                    command.Parameters.AddWithValue("@gender", formattedString(Gender));
+                    command.Parameters.AddWithValue("@Email", Email);
+                    command.Parameters.AddWithValue("@DateOfBirth", DateOfBirth); 
+                    command.Parameters.AddWithValue("@Password", unsecurePassword);
+                    command.ExecuteNonQuery();
+
                     // After successful registration
                     IsViewVisible = false;
-                    var loginview = new LoginView();
-                    loginview.Show();
+                    var loginView = new LoginView();
+                    loginView.Show();
                     Application.Current.MainWindow.Close();
                     MessageBox.Show("User Registered Successfully", "Congratulations", MessageBoxButton.OK, MessageBoxImage.Information);
-
                 }
             }
-
+            catch (Exception ex)
+            {
+                // Log exception or show message
+                ErrorMessage = "An error occurred during registration: " + ex.Message;
+            }
         }
+
         public static bool IsValidEmail(string email)
         {
             string pattern = @"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$";
